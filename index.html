@@ -132,6 +132,19 @@ details.rules summary{cursor:pointer;font-weight:700}
 .rulegrid{display:grid;grid-template-columns:1fr auto;gap:4px 16px;font-size:14px;margin-top:10px}
 .rulegrid dt{color:var(--muted)} .rulegrid dd{margin:0;font-weight:700;text-align:right}
 .rulelist{font-size:14px;margin:10px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+
+/* stats */
+.hl{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.aw{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--bg);display:flex;flex-direction:column;gap:2px}
+.aw .an{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);font-weight:800}
+.aw .ah{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:18px;overflow-wrap:anywhere}
+.aw .ad{font-size:13px;color:var(--muted)}
+.stwrap{overflow-x:auto}
+table.st{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:14px}
+table.st th,table.st td{padding:7px 6px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+table.st th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
+table.st th:first-child,table.st td:first-child{text-align:left}
+@media (max-width:380px){.hl{grid-template-columns:1fr}}
 </style>
 <style>body{margin:0}[hidden]{display:none!important}</style>
 </head>
@@ -353,7 +366,7 @@ function playView(){
   }
 
   const reset = `<button class="small ghost" data-act="newgame" id="newgame">${confirmKey==="new"?"Tap to confirm":"New game"}</button>`;
-  return header(reset) + top + `<div class="sides">${sides}</div>` + roundBlock + history + rulesCard(R) +
+  return header(reset) + top + `<div class="sides">${sides}</div>` + roundBlock + history + statsView() + rulesCard(R) +
     `<p class="hint">Your game is kept on this device, and the screen stays on while you play.</p>`;
 }
 
@@ -438,6 +451,35 @@ document.addEventListener("input", e => {
   }
 });
 document.addEventListener("change", e => { if (e.target.id === "first-dealer"){ state.setup.firstDealer = +e.target.value; save(); } });
+
+
+function topOf(arr){ const m = Math.max(...arr); return { m, who: arr.map((v,i)=>i).filter(i=>arr[i]===m) }; }
+function awCard(title, who, detail){ return `<div class="aw"><span class="an">${title}</span><span class="ah">${who}</span><span class="ad">${detail}</span></div>`; }
+function statTable(head, rows){ return `<div class="stwrap"><table class="st"><thead><tr>${head.map(h=>`<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`; }
+const plural = (n, w) => `${n} ${w}${n===1?"":"s"}`;
+
+function statsView(){
+  const Rr = state.rounds, n = Rr.length; if (!n) return "";
+  const ns = state.sides.length, z = () => Array(ns).fill(0);
+  const won = z(), cards = z(), spades = z(), big = z(), little = z(), aces = z(), sweeps = z();
+  Rr.forEach(r => { const pts = roundPoints(r), m = Math.max(...pts);
+    pts.forEach((v,i)=>{ if (v===m) won[i]++; });
+    if (r.cards >= 0) cards[r.cards]++; if (r.spades >= 0) spades[r.spades]++;
+    big[r.big]++; little[r.little]++; [0,1,2,3].forEach(a => aces[r["ace"+a]]++);
+    r.sweeps.forEach((v,i)=> sweeps[i]+=v); });
+  const nm = idx => idx.map(S).join(", ");
+  const a = topOf(aces), sw = topOf(sweeps), bc = topOf(big), w = topOf(won);
+  const head = ["", ...state.sides.map((_,i)=>S(i))];
+  const row = (label, arr) => [label, ...arr];
+  const rows = [row("Rounds won", won), row("Most cards", cards), row("Most spades", spades), row("Big Casino", big), row("Little Casino", little), row("Aces", aces)];
+  if (state.rules.sweeps) rows.push(row("Sweeps", sweeps));
+  return `<div class="panel"><h2>Stats</h2><div class="hl">
+    ${awCard("Round winner", nm(w.who), `Top score in ${plural(w.m,"round")}`)}
+    ${awCard("Ace collector", nm(a.who), `${plural(a.m,"ace")} taken`)}
+    ${awCard("Big Casino", nm(bc.who), `Took the 10♦ ${plural(bc.m,"time")}`)}
+    ${state.rules.sweeps?awCard("Clean sweep", sw.m?nm(sw.who):"Nobody yet", sw.m?`${plural(sw.m,"sweep")}`:"No sweeps yet"):awCard("Card hog", nm(topOf(cards).who), `Most cards ${plural(topOf(cards).m,"time")}`)}
+  </div>${statTable(head, rows)}</div>`;
+}
 
 render();
 keepAwake();
